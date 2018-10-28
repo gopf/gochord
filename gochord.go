@@ -2,6 +2,7 @@ package main
 
 import (
     "os"
+    "strconv"
     "github.com/llgcode/draw2d"
     "github.com/llgcode/draw2d/draw2dimg"
     "github.com/llgcode/draw2d/draw2dkit"
@@ -48,31 +49,68 @@ func drawChord(gc draw2d.GraphicContext, chord chordInfo, stringCount int) {
 	gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0x00, 0xff})
 	gc.SetLineWidth(2)
 
+    fretOffset := getFretOffset(chord)
+
     drawBox(gc, stringCount)
-    drawNut(gc, stringCount)
+    if fretOffset > 0 {
+        drawText(gc, fontSize * 2 / 3, leftMargin + stringCount * spacing + dotSize + 4, topMargin + spacing + fontSize * 1 / 3, strconv.Itoa(fretOffset + 1))
+    } else {
+        drawNut(gc, stringCount)
+    }
+
     drawFrets(gc, stringCount)
     drawStrings(gc, stringCount)
-    drawText(gc, leftMargin, 5 + fontSize, chord.name)
+    drawText(gc, fontSize, leftMargin, 5 + fontSize, chord.name)
 
     for i, v := range chord.strings {
-        if v.mainFret > 0 {
-            gc.SetFillColor(color.RGBA{0xc0, 0xc0, 0xc0, 0xff})
-        } else {
+        x := float64(leftMargin + i * spacing)
+        if v.mainFret == 0 {
             gc.SetFillColor(color.RGBA{0xff, 0xff, 0xff, 0xff})
+            draw2dkit.Circle(gc, x, float64(topMargin - dotSize - 4), dotSize)
+            gc.FillStroke()
+        } else if v.mainFret > 0 {
+            gc.SetFillColor(color.RGBA{0xc0, 0xc0, 0xc0, 0xff})
+            draw2dkit.Circle(gc, x, float64(topMargin + (v.mainFret - fretOffset) * spacing - dotSize - 4), dotSize)
+            gc.FillStroke()
+        } else {
+            gc.MoveTo(x - dotSize, topMargin - 4)
+            gc.LineTo(float64(x + dotSize), float64(topMargin - 4 - 2 * dotSize))
+            gc.Stroke()
+            gc.MoveTo(x + dotSize, topMargin - 4)
+            gc.LineTo(float64(x - dotSize), float64(topMargin - 4 - 2 * dotSize))
+            gc.Stroke()
         }
-        draw2dkit.Circle(gc, float64(leftMargin + i * spacing), float64(topMargin + v.mainFret * spacing - dotSize - 4), dotSize)
-        gc.FillStroke()
     }
 }
 
-func drawText(gc draw2d.GraphicContext, x int, y int, text string) {
-    gc.SetFontSize(fontSize)
+func getFretOffset(chord chordInfo) int {
+    var min, max int = 1000, -1
+    for _, v := range chord.strings {
+        fret := v.mainFret
+        if fret > 0 {
+            if fret > max {
+                max = fret
+            }
+            if fret < min {
+                min = fret
+            }
+        }
+    }
+    if max > fretCount {
+        return min - 1
+    } else {
+        return 0
+    }
+}
+
+func drawText(gc draw2d.GraphicContext, fontSize int, x int, y int, text string) {
+    gc.SetFontSize(float64(fontSize))
 	gc.SetFillColor(color.RGBA{0x00, 0x00, 0x00, 0xff})
 	gc.FillStringAt(text, float64(x), float64(y))
 }
 
 func drawBox(gc draw2d.GraphicContext, stringCount int) {
-	gc.MoveTo(leftMargin, topMargin) // should always be called first for a new path
+	gc.MoveTo(leftMargin, topMargin)
 	gc.LineTo(float64(leftMargin + stringCount * spacing), float64(topMargin))
 	gc.LineTo(float64(leftMargin + stringCount * spacing), float64(topMargin + fretCount * spacing))
 	gc.LineTo(leftMargin, topMargin + fretCount * spacing)

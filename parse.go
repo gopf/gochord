@@ -5,7 +5,7 @@ import (
     "strconv"
 )
 
-var chordPattern = regexp.MustCompile("\\{(?P<name>[\\w]+)[\\s]+frets[\\s]+(?P<frets>(?:[\\d\\s]+))\\}")
+var chordPattern = regexp.MustCompile("\\{(?P<name>[\\w]+)[\\s]+frets[\\s]+(?P<frets>(?:[x\\d\\s]+))\\}")
 var whitespacePattern = regexp.MustCompile("[\\s]+")
 
 type stringInfo struct {
@@ -38,7 +38,9 @@ func parseChord(s string) chordInfo {
     fields := matchRegexp(chordPattern, s)
     var strings []stringInfo
     for _, fret := range whitespacePattern.Split(fields["frets"], -1) {
-        if fretnum, err := strconv.Atoi(fret); err == nil {
+        if fret == "x" {
+            strings = append(strings, stringInfo{-1, nil})
+        } else if fretnum, err := strconv.Atoi(fret); err == nil {
             strings = append(strings, stringInfo{fretnum, nil})
         }
     }
