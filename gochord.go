@@ -1,6 +1,7 @@
 package main
 
 import (
+    "fmt"
     "os"
     "strconv"
     "github.com/llgcode/draw2d"
@@ -44,6 +45,15 @@ func loadFont() {
     }
 }
 
+func setFillColor(gc draw2d.GraphicContext, isRoot bool, defaultColor uint8) {
+    c := defaultColor
+    if isRoot {
+        c = 0
+    }
+    fmt.Println(c)
+    gc.SetFillColor(color.RGBA{c, c, c, 0xff})
+}
+
 func drawChord(gc draw2d.GraphicContext, chord chordInfo, stringCount int) {
 	gc.SetFillColor(color.RGBA{0xff, 0xff, 0xff, 0xff})
 	gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0x00, 0xff})
@@ -65,19 +75,20 @@ func drawChord(gc draw2d.GraphicContext, chord chordInfo, stringCount int) {
     for i, v := range chord.strings {
         x := float64(leftMargin + i * spacing)
         if v.mainFret == 0 {
-            gc.SetFillColor(color.RGBA{0xff, 0xff, 0xff, 0xff})
+            setFillColor(gc, v.rootFret == v.mainFret, 0xff)
             draw2dkit.Circle(gc, x, float64(topMargin - dotSize - 4), dotSize)
             gc.FillStroke()
         } else if v.mainFret > 0 {
-            gc.SetFillColor(color.RGBA{0xc0, 0xc0, 0xc0, 0xff})
+            setFillColor(gc, v.rootFret == v.mainFret, 0xc0)
             draw2dkit.Circle(gc, x, float64(topMargin + (v.mainFret - fretOffset) * spacing - dotSize - 4), dotSize)
             gc.FillStroke()
         } else {
-            gc.MoveTo(x - dotSize, topMargin - 4)
-            gc.LineTo(float64(x + dotSize), float64(topMargin - 4 - 2 * dotSize))
+            delta := dotSize * 0.7
+            gc.MoveTo(x - delta, topMargin - 4)
+            gc.LineTo(float64(x + delta), float64(topMargin - 4 - 2 * delta))
             gc.Stroke()
-            gc.MoveTo(x + dotSize, topMargin - 4)
-            gc.LineTo(float64(x - dotSize), float64(topMargin - 4 - 2 * dotSize))
+            gc.MoveTo(x + delta, topMargin - 4)
+            gc.LineTo(float64(x - delta), float64(topMargin - 4 - 2 * delta))
             gc.Stroke()
         }
     }

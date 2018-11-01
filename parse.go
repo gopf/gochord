@@ -5,11 +5,14 @@ import (
     "strconv"
 )
 
-var chordPattern = regexp.MustCompile("\\{(?P<name>[\\w]+)[\\s]+frets[\\s]+(?P<frets>(?:[x\\d\\s]+))\\}")
+var chordPattern = regexp.MustCompile("\\{(?P<name>[\\w]+)[\\s]+frets[\\s]+(?P<frets>(?:[\\d\\s\\+x]+))\\}")
+var rootPattern = regexp.MustCompile("\\+(?P<fretnum>[\\d]+)")
+var fretPattern = regexp.MustCompile("(?P<fretnum>[\\d]+)")
 var whitespacePattern = regexp.MustCompile("[\\s]+")
 
 type stringInfo struct {
     mainFret int
+    rootFret int
     extraFrets []int
 }
 
@@ -39,10 +42,27 @@ func parseChord(s string) chordInfo {
     var strings []stringInfo
     for _, fret := range whitespacePattern.Split(fields["frets"], -1) {
         if fret == "x" {
-            strings = append(strings, stringInfo{-1, nil})
-        } else if fretnum, err := strconv.Atoi(fret); err == nil {
-            strings = append(strings, stringInfo{fretnum, nil})
+            strings = append(strings, stringInfo{-1, -1, nil})
+            continue
         }
+
+        rootMatch := matchRegexp(rootPattern, fret)
+        if rootValue, ok := rootMatch["fretnum"]; ok {
+            if fretnum, err := strconv.Atoi(rootValue); err == nil {
+                strings = append(strings, stringInfo{fretnum, fretnum, nil})
+                continue
+            }
+        }
+
+        fretMatch := matchRegexp(fretPattern, fret)
+        if fretValue, ok := fretMatch["fretnum"]; ok {
+            if fretnum, err := strconv.Atoi(fretValue); err == nil {
+                strings = append(strings, stringInfo{fretnum, -1, nil})
+                continue
+            }
+        }
+
+        // no match
     }
     return chordInfo{ fields["name"], strings }
 }
