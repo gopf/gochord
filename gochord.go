@@ -1,7 +1,6 @@
 package main
 
 import (
-    "fmt"
     "os"
     "strconv"
     "github.com/llgcode/draw2d"
@@ -18,7 +17,6 @@ const rightMargin = 40
 const topMargin = 60
 const bottomMargin = 10
 const spacing = 30
-const fretCount = 4
 const fontSize = 24
 const dotSize = 6
 
@@ -27,12 +25,12 @@ func main() {
 
     for _, arg := range os.Args[1:] {
         chord := parseChord(arg)
-        stringCount := len(chord.strings) - 1
+        stringCount, fretCount, fretOffset := getFretInfo(chord)
 
         dest := image.NewRGBA(image.Rect(0, 0, leftMargin + rightMargin + spacing * stringCount, topMargin + bottomMargin + fretCount * spacing))
         gc := draw2dimg.NewGraphicContext(dest)
 
-        drawChord(gc, chord, stringCount)
+        drawChord(gc, chord, stringCount, fretCount, fretOffset)
 
         draw2dimg.SaveToPngFile(chord.name + ".png", dest)
     }
@@ -50,67 +48,72 @@ func setFillColor(gc draw2d.GraphicContext, isRoot bool, defaultColor uint8) {
     if isRoot {
         c = 0
     }
-    fmt.Println(c)
     gc.SetFillColor(color.RGBA{c, c, c, 0xff})
 }
 
-func drawChord(gc draw2d.GraphicContext, chord chordInfo, stringCount int) {
+func drawChord(gc draw2d.GraphicContext, chord chordInfo, stringCount int, fretCount int, fretOffset int) {
 	gc.SetFillColor(color.RGBA{0xff, 0xff, 0xff, 0xff})
 	gc.SetStrokeColor(color.RGBA{0x00, 0x00, 0x00, 0xff})
 	gc.SetLineWidth(2)
 
-    fretOffset := getFretOffset(chord)
-
-    drawBox(gc, stringCount)
+    drawBox(gc, stringCount, fretCount)
     if fretOffset > 0 {
         drawText(gc, fontSize * 2 / 3, leftMargin + stringCount * spacing + dotSize + 4, topMargin + spacing + fontSize * 1 / 3, strconv.Itoa(fretOffset + 1))
     } else {
         drawNut(gc, stringCount)
     }
 
-    drawFrets(gc, stringCount)
-    drawStrings(gc, stringCount)
+    drawFrets(gc, stringCount, fretCount)
+    drawStrings(gc, stringCount, fretCount)
     drawText(gc, fontSize, leftMargin, 5 + fontSize, chord.name)
 
     for i, v := range chord.strings {
         x := float64(leftMargin + i * spacing)
-        if v.mainFret == 0 {
-            setFillColor(gc, v.rootFret == v.mainFret, 0xff)
-            draw2dkit.Circle(gc, x, float64(topMargin - dotSize - 4), dotSize)
-            gc.FillStroke()
-        } else if v.mainFret > 0 {
-            setFillColor(gc, v.rootFret == v.mainFret, 0xc0)
-            draw2dkit.Circle(gc, x, float64(topMargin + (v.mainFret - fretOffset) * spacing - dotSize - 4), dotSize)
-            gc.FillStroke()
-        } else {
-            delta := dotSize * 0.7
-            gc.MoveTo(x - delta, topMargin - 4)
-            gc.LineTo(float64(x + delta), float64(topMargin - 4 - 2 * delta))
-            gc.Stroke()
-            gc.MoveTo(x + delta, topMargin - 4)
-            gc.LineTo(float64(x - delta), float64(topMargin - 4 - 2 * delta))
-            gc.Stroke()
+        for _, fret := range v.frets {
+            if fret == 0 {
+                setFillColor(gc, v.rootFret == fret, 0xff)
+                draw2dkit.Circle(gc, x, float64(topMargin - dotSize - 4), dotSize)
+                gc.FillStroke()
+            } else if fret > 0 {
+                setFillColor(gc, v.rootFret == fret, 0xc0)
+                draw2dkit.Circle(gc, x, float64(topMargin + (fret - fretOffset) * spacing - dotSize - 4), dotSize)
+                gc.FillStroke()
+            } else {
+                delta := dotSize * 0.7
+                gc.MoveTo(x - delta, topMargin - 4)
+                gc.LineTo(float64(x + delta), float64(topMargin - 4 - 2 * delta))
+                gc.Stroke()
+                gc.MoveTo(x + delta, topMargin - 4)
+                gc.LineTo(float64(x - delta), float64(topMargin - 4 - 2 * delta))
+                gc.Stroke()
+            }
         }
     }
 }
 
-func getFretOffset(chord chordInfo) int {
-    var min, max int = 1000, -1
+func getFretInfo(chord chordInfo) (int, int, int) {
+    var min, max int = 999, -1
+    stringCount := len(chord.strings) - 1
     for _, v := range chord.strings {
-        fret := v.mainFret
-        if fret > 0 {
-            if fret > max {
-                max = fret
-            }
-            if fret < min {
-                min = fret
+        for _, fret := range v.frets {
+            if fret >= 0 {
+                if fret > max {
+                    max = fret
+                }
+                if fret < min {
+                    min = fret
+                }
             }
         }
     }
-    if max > fretCount {
-        return min - 1
+    if max - min >= 4 {
+        if (min > 0) {
+            return stringCount, max - min + 1, min - 1
+        } else {
+            return stringCount, max - min, min
+        }
     } else {
-        return 0
+        return stringCount, 4, min - 1
     }
 }
 
@@ -120,11 +123,11 @@ func drawText(gc draw2d.GraphicContext, fontSize int, x int, y int, text string)
 	gc.FillStringAt(text, float64(x), float64(y))
 }
 
-func drawBox(gc draw2d.GraphicContext, stringCount int) {
+func drawBox(gc draw2d.GraphicContext, stringCount int, fretCount int) {
 	gc.MoveTo(leftMargin, topMargin)
 	gc.LineTo(float64(leftMargin + stringCount * spacing), float64(topMargin))
 	gc.LineTo(float64(leftMargin + stringCount * spacing), float64(topMargin + fretCount * spacing))
-	gc.LineTo(leftMargin, topMargin + fretCount * spacing)
+	gc.LineTo(leftMargin, float64(topMargin + fretCount * spacing))
 	gc.Close()
 	gc.FillStroke()
 }
@@ -135,7 +138,7 @@ func drawNut(gc draw2d.GraphicContext, stringCount int) {
     gc.Stroke()
 }
 
-func drawFrets(gc draw2d.GraphicContext, stringCount int) {
+func drawFrets(gc draw2d.GraphicContext, stringCount int, fretCount int) {
     for i:=1 ; i < fretCount ; i++ {
         gc.MoveTo(float64(leftMargin), float64(topMargin + i * spacing))
         gc.LineTo(float64(leftMargin + spacing * stringCount), float64(topMargin + i * spacing))
@@ -143,7 +146,7 @@ func drawFrets(gc draw2d.GraphicContext, stringCount int) {
     }
 }
 
-func drawStrings(gc draw2d.GraphicContext, stringCount int) {
+func drawStrings(gc draw2d.GraphicContext, stringCount int, fretCount int) {
     for i:=1 ; i < stringCount ; i++ {
         gc.MoveTo(float64(leftMargin + spacing * i), float64(topMargin))
         gc.LineTo(float64(leftMargin + spacing * i), float64(topMargin + fretCount * spacing))
